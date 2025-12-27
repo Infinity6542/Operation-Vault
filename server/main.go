@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -183,14 +184,16 @@ func broadcast(msg Message, sender *webtransport.Stream) {
 		return
 	}
 
-	data, _ := json.Marshal(msg)
+	// Legacy
+	// data, _ := json.Marshal(msg)
 
 	for _, s := range streams {
 		if s.StreamID() == sender.StreamID() {
 			continue // Skip sender
 		}
-		_, err := s.Write(data)
-		if err != nil {
+		// Legacy
+		// _, err := s.Write(data)
+		if err := json.NewEncoder(s).Encode(msg); err != nil {
 			logger.Errorf("Error broadcasting to stream %d: %v", s.StreamID(), err)
 		}
 	}
