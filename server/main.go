@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -12,21 +11,22 @@ import (
 	"crypto/x509/pkix"
 	"embed"
 	"encoding/base64"
-	"encoding/pem"
 	"encoding/json"
+	"encoding/pem"
 	"io"
 	"io/fs"
 	"math/big"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
-	"os"
 
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
+
 	// "go.step.sm/crypto/fingerprint"
 	"go.uber.org/zap"
 )
@@ -35,11 +35,11 @@ import (
 var embedFS embed.FS
 var logger *zap.SugaredLogger
 
-//* Structs
+// * Structs
 type Message struct {
-	Type string `json:"type"`
+	Type      string `json:"type"`
 	ChannelID string `json:"channel_id"`
-	Payload string `json:"payload"`
+	Payload   string `json:"payload"`
 }
 
 type Hub struct {
@@ -51,7 +51,7 @@ var hub = Hub{
 	Channels: make(map[string][]*webtransport.Stream),
 }
 
-// Ignore redeclared warning, test_client is only temporary 
+// Ignore redeclared warning, test_client is only temporary
 func main() {
 	rawLogger, _ := zap.NewDevelopment()
 	defer rawLogger.Sync()
@@ -69,20 +69,20 @@ func main() {
 	// Setup WebTransport server
 	wt := webtransport.Server{
 		H3: http3.Server{
-			Addr: addr,
+			Addr:    addr,
 			Handler: mux,
 			TLSConfig: &tls.Config{
 				Certificates: []tls.Certificate{tlsCert},
-				NextProtos: []string{"h3"},
+				NextProtos:   []string{"h3"},
 			},
 			EnableDatagrams: true,
 			QUICConfig: &quic.Config{
-				InitialPacketSize: 1200,
+				InitialPacketSize:       1200,
 				DisablePathMTUDiscovery: true,
-				EnableDatagrams: true,
+				EnableDatagrams:         true,
 			},
 		},
-		CheckOrigin: func(r *http.Request) bool {return true},
+		CheckOrigin: func(r *http.Request) bool { return true },
 	}
 
 	// WebTransport endpoint
@@ -126,8 +126,8 @@ func main() {
 		defer wg.Done()
 		logger.Infof("Listening on TCP %s (HTTPS)", addr)
 		serverHTTP := &http.Server{
-			Addr: addr,
-			Handler: mux,
+			Addr:      addr,
+			Handler:   mux,
 			TLSConfig: &tls.Config{Certificates: []tls.Certificate{tlsCert}},
 		}
 		if err := serverHTTP.ListenAndServeTLS("", ""); err != nil {
@@ -228,16 +228,16 @@ func certHandler() (tls.Certificate, string) {
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	template := x509.Certificate{
 		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{Organization: []string{"Operation Vault"}},
-		NotBefore: time.Now().Add(-24 * time.Hour),
-		NotAfter: time.Now().Add(time.Hour * 24 * 10),
-		KeyUsage: x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		DNSNames: []string{"localhost"},
-		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
+		Subject:      pkix.Name{Organization: []string{"Operation Vault"}},
+		NotBefore:    time.Now().Add(-24 * time.Hour),
+		NotAfter:     time.Now().Add(time.Hour * 24 * 10),
+		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		DNSNames:     []string{"localhost"},
+		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
 	}
 	derBytes, _ := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
-	
+
 	// Save certs to disk
 	certOut, _ := os.Create(certFile)
 	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
