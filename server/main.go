@@ -170,6 +170,8 @@ func handleWebTransport(conn *webtransport.Session) {
 		case "message":
 			logger.Infof("Message received for channel %s: %s", msg.ChannelID, msg.Payload)
 			broadcast(msg, stream)
+		default:
+			broadcast(msg, stream)
 		}
 	}
 }
