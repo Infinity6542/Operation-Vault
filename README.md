@@ -2,7 +2,7 @@
 aliases: 
 tags: 
 datecreated: 2025-12-24T02:07
-datemodified: 2025-12-24T18:24
+datemodified: 2025-12-30T21:44
 ---
 # Operation Vault
 Operation Vault (OV, OpVault) consists of three major components: an Obsidian client, web client and relay server. Both the web client and relay server are meant to be self-hostable, while the Obsidian will work after installation. The plugin must work in conjunction with the relay server.
@@ -70,6 +70,7 @@ This component will handle connections between users, forwarding updates and aut
 > [!info] Hosting
 > I plan on making this 100% self-hostable. The default config will assume you’re using Dokploy (it really does make it easier). I’ll also provide some configs if you don’t have Dokploy, but there’ll be more work with the reverse proxy.
 ### Networking & Security
+Data sent will be encrypted, effectively making the coordination server blind. A key pair exchange system will be used to handle encryption.
 - WebTransport (QUIC)
 - BYOS (any S3-compatible storage)
 	- Default will be using Cloudflare R2
