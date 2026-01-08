@@ -188,7 +188,7 @@ func broadcast(msg Message, sender *webtransport.Stream) {
 	// data, _ := json.Marshal(msg)
 
 	for _, s := range streams {
-		if s.StreamID() == sender.StreamID() {
+		if s == sender {
 			continue // Skip sender
 		}
 		// Legacy
