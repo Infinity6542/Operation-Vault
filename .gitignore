@@ -4,3 +4,4 @@ server/key.pem
 plugin/node_modules
 plugin/main.js
 .wakatime-project
+**/*.txt
