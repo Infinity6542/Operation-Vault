@@ -149,15 +149,24 @@ func handleWebTransport(conn *webtransport.Session) {
 	logger.Infof("Session from %s accepted.", conn.RemoteAddr().String())
 	defer conn.CloseWithError(0, "Closing session")
 
-	stream, err := conn.AcceptStream(context.Background())
-	if err != nil {
-		logger.Errorf("Failed to accept stream: %v", err)
-		return
+	for {
+		stream, err := conn.AcceptStream(context.Background())
+		if err != nil {
+			logger.Errorf("Failed to accept stream: %v", err)
+			return
+		}
+
+		go handleStream(stream)
 	}
+}
+
+// conn *webtransport.Session is currently unused and placed in this comment instead of an argument
+func handleStream(stream *webtransport.Stream) {
 	defer stream.Close()
 
+
 	decoder := json.NewDecoder(stream)
-	for {
+
 		var msg Message
 		if err := decoder.Decode(&msg); err != nil {
 			if err == io.EOF {
@@ -167,6 +176,36 @@ func handleWebTransport(conn *webtransport.Session) {
 			}
 			return
 		}
+
+		if msg.Type == "upload" {
+			logger.Infof("Upload request received for file ID: %s", msg.Payload)
+			multiReader := io.MultiReader(decoder.Buffered(), stream)
+
+			err := upload(multiReader, msg.Payload)
+			if err != nil {
+				logger.Errorf("Upload failed for file ID %s: %v", msg.Payload, err)
+			} else {
+				logger.Infof("Upload successful for file ID %s", msg.Payload)
+			}
+			return
+		}
+
+		if msg.Type == "join" {
+			logger.Infof("Client joining channel: %s", msg.ChannelID)
+			hub.Lock()
+			hub.Channels[msg.ChannelID] = append(hub.Channels[msg.ChannelID], stream)
+			hub.Unlock()
+		} else {
+			broadcast(msg, stream)
+		}
+		
+		for {
+			if err := decoder.Decode(&msg); err != nil {
+				if err == io.EOF {
+					logger.Errorf("Stream closed unexpectedly by client: %v", err)
+					break;
+				}
+			}
 		switch msg.Type {
 		case "join":
 			logger.Infof("Client joining channel: %s", msg.ChannelID)
@@ -269,10 +308,28 @@ func initS3() {
 	}
 
 	s3Client = s3.NewFromConfig(cfg, func (o *s3.Options) {
-		o.BaseEndpoint = aws.String("https://52734793e62aadf91e3bc988c6d667cc.r2.cloudflarestorage.com")
+		o.BaseEndpoint = aws.String("https://52734793e62aadf91e3bc988c6d667cc.eu.r2.cloudflarestorage.com")
 		o.Region = "auto"
 		// o.UsePathStyle = true
 	})
 
 	logger.Info("S3 client initialised")
+}
+
+func upload(stream io.Reader, fileID string) error {
+	bucketName := "opvault-test"
+
+	_, err := s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(fileID),
+		Body:   stream,
+	})
+
+	if err != nil {
+		logger.Errorf("Failed to upload file to S3: %v", err)
+		return err
+	}
+	
+	logger.Infof("File %s uploaded successfully to bucket %s", fileID, bucketName)
+	return nil
 }
