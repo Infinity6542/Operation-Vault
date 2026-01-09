@@ -26,14 +26,17 @@ import (
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
-
 	// "go.step.sm/crypto/fingerprint"
 	"go.uber.org/zap"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 //go:embed embed_client/*
 var embedFS embed.FS
 var logger *zap.SugaredLogger
+var s3Client *s3.Client
 
 // * Structs
 type Message struct {
@@ -63,6 +66,9 @@ func main() {
 
 	logger.Infof("Starting server at https://%s", addr)
 	logger.Infof("Certificate hash: '%s'", fingerprint)
+
+	logger.Info("Initialising S3 client...")
+	initS3()
 
 	mux := http.NewServeMux()
 
@@ -254,4 +260,19 @@ func certHandler() (tls.Certificate, string) {
 	sha256Sum := sha256.Sum256(derBytes)
 	fingerprint := base64.StdEncoding.EncodeToString(sha256Sum[:])
 	return tlsCert, fingerprint
+}
+
+func initS3() {
+	cfg, err := config.LoadDefaultConfig(context.TODO())
+	if err != nil {
+		logger.Fatalf("Unable to load AWS SDK config, %v", err)
+	}
+
+	s3Client = s3.NewFromConfig(cfg, func (o *s3.Options) {
+		o.BaseEndpoint = aws.String("https://52734793e62aadf91e3bc988c6d667cc.r2.cloudflarestorage.com")
+		o.Region = "auto"
+		// o.UsePathStyle = true
+	})
+
+	logger.Info("S3 client initialised")
 }
