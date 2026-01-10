@@ -26,11 +26,12 @@ import (
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
+
 	// "go.step.sm/crypto/fingerprint"
-	"go.uber.org/zap"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"go.uber.org/zap"
 )
 
 //go:embed embed_client/*
@@ -164,48 +165,47 @@ func handleWebTransport(conn *webtransport.Session) {
 func handleStream(stream *webtransport.Stream) {
 	defer stream.Close()
 
-
 	decoder := json.NewDecoder(stream)
 
-		var msg Message
+	var msg Message
+	if err := decoder.Decode(&msg); err != nil {
+		if err == io.EOF {
+			logger.Errorf("Stream closed unexpectedly by client: %v", err)
+		} else {
+			logger.Errorf("Error decoding message: %v", err)
+		}
+		return
+	}
+
+	if msg.Type == "upload" {
+		logger.Infof("Upload request received for file ID: %s", msg.Payload)
+		multiReader := io.MultiReader(decoder.Buffered(), stream)
+
+		err := upload(multiReader, msg.Payload)
+		if err != nil {
+			logger.Errorf("Upload failed for file ID %s: %v", msg.Payload, err)
+		} else {
+			logger.Infof("Upload successful for file ID %s", msg.Payload)
+		}
+		return
+	}
+
+	if msg.Type == "join" {
+		logger.Infof("Client joining channel: %s", msg.ChannelID)
+		hub.Lock()
+		hub.Channels[msg.ChannelID] = append(hub.Channels[msg.ChannelID], stream)
+		hub.Unlock()
+	} else {
+		broadcast(msg, stream)
+	}
+
+	for {
 		if err := decoder.Decode(&msg); err != nil {
 			if err == io.EOF {
 				logger.Errorf("Stream closed unexpectedly by client: %v", err)
-			} else {
-				logger.Errorf("Error decoding message: %v", err)
+				break
 			}
-			return
 		}
-
-		if msg.Type == "upload" {
-			logger.Infof("Upload request received for file ID: %s", msg.Payload)
-			multiReader := io.MultiReader(decoder.Buffered(), stream)
-
-			err := upload(multiReader, msg.Payload)
-			if err != nil {
-				logger.Errorf("Upload failed for file ID %s: %v", msg.Payload, err)
-			} else {
-				logger.Infof("Upload successful for file ID %s", msg.Payload)
-			}
-			return
-		}
-
-		if msg.Type == "join" {
-			logger.Infof("Client joining channel: %s", msg.ChannelID)
-			hub.Lock()
-			hub.Channels[msg.ChannelID] = append(hub.Channels[msg.ChannelID], stream)
-			hub.Unlock()
-		} else {
-			broadcast(msg, stream)
-		}
-		
-		for {
-			if err := decoder.Decode(&msg); err != nil {
-				if err == io.EOF {
-					logger.Errorf("Stream closed unexpectedly by client: %v", err)
-					break;
-				}
-			}
 		switch msg.Type {
 		case "join":
 			logger.Infof("Client joining channel: %s", msg.ChannelID)
@@ -307,7 +307,7 @@ func initS3() {
 		logger.Fatalf("Unable to load AWS SDK config, %v", err)
 	}
 
-	s3Client = s3.NewFromConfig(cfg, func (o *s3.Options) {
+	s3Client = s3.NewFromConfig(cfg, func(o *s3.Options) {
 		o.BaseEndpoint = aws.String("https://52734793e62aadf91e3bc988c6d667cc.eu.r2.cloudflarestorage.com")
 		o.Region = "auto"
 		// o.UsePathStyle = true
@@ -329,7 +329,7 @@ func upload(stream io.Reader, fileID string) error {
 		logger.Errorf("Failed to upload file to S3: %v", err)
 		return err
 	}
-	
+
 	logger.Infof("File %s uploaded successfully to bucket %s", fileID, bucketName)
 	return nil
 }
