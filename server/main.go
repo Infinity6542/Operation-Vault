@@ -39,6 +39,8 @@ var embedFS embed.FS
 var logger *zap.SugaredLogger
 var s3Client *s3.Client
 
+var bucketName = "opvault-test"
+
 // * Structs
 type Message struct {
 	Type      string `json:"type"`
@@ -319,8 +321,6 @@ func initS3() {
 }
 
 func upload(stream io.Reader, fileID string) error {
-	bucketName := "opvault-test"
-
 	_, err := s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
 		Bucket: aws.String(bucketName),
 		Key:    aws.String(fileID),
