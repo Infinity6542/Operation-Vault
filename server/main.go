@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -177,12 +178,18 @@ func handleStream(stream *webtransport.Stream) {
 			logger.Errorf("Error decoding message: %v", err)
 		}
 		return
-	}
+	}	
 
 	switch msg.Type {
 	case "upload":
 		logger.Infof("Upload request received for file ID: %s", msg.Payload)
 		multiReader := io.MultiReader(decoder.Buffered(), stream)
+
+		rm := make([]byte, 1)
+		multiReader.Read(rm)
+		if rm[0] != '\n' {
+			logger.Warnf("Expected newline after JSON message, got: %v", rm[0])
+		}
 
 		err := upload(multiReader, msg.Payload)
 		if err != nil {
@@ -190,8 +197,13 @@ func handleStream(stream *webtransport.Stream) {
 		} else {
 			logger.Infof("Upload successful for file ID %s", msg.Payload)
 		}
+		return
 	case "download":
 		download(stream, msg.Payload)
+		return
+	case "remove":
+		remove(msg.Payload)
+		return
 	case "join":
 		logger.Infof("Client joining channel: %s", msg.ChannelID)
 		hub.Lock()
@@ -205,21 +217,25 @@ func handleStream(stream *webtransport.Stream) {
 		if err := decoder.Decode(&msg); err != nil {
 			if err == io.EOF {
 				logger.Errorf("Stream closed unexpectedly by client: %v", err)
-				break
+			} else {
+				logger.Errorf("Error decoding message: %v", err)
 			}
+			break
 		}
-		switch msg.Type {
-		case "join":
-			logger.Infof("Client joining channel: %s", msg.ChannelID)
-			hub.Lock()
-			hub.Channels[msg.ChannelID] = append(hub.Channels[msg.ChannelID], stream)
-			hub.Unlock()
-		case "message":
+	//TODO: Improve and consolidate where logs are output.
+	// Currently, some logs are handled in the switch cases while others are handled
+	// within the functions. Ideally, the logs should be handled within the functions
+	// I think? I'd make it easier to reuse the functions this way so I this is the
+	// way to go.
+	switch msg.Type {
+	case "join":
+		logger.Info("Join?")
+	case "message":
 			logger.Infof("Message received for channel %s: %s", msg.ChannelID, msg.Payload)
 			broadcast(msg, stream)
-		default:
-			broadcast(msg, stream)
-		}
+	default:
+		broadcast(msg, stream)
+	}
 	}
 }
 
@@ -321,10 +337,16 @@ func initS3() {
 }
 
 func upload(stream io.Reader, fileID string) error {
-	_, err := s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	data, err := io.ReadAll(stream)
+	if err != nil {
+		logger.Errorf("Failed to read data from stream: %v", err)
+		return err
+	}
+
+	_, err = s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
 		Bucket: aws.String(bucketName),
 		Key:    aws.String(fileID),
-		Body:   stream,
+		Body:   bytes.NewReader(data),
 	})
 
 	if err != nil {
@@ -336,7 +358,30 @@ func upload(stream io.Reader, fileID string) error {
 	return nil
 }
 
-func delete(fileID string) error {
+func download(stream *webtransport.Stream, fileID string) error {
+	logger.Infof("Downloading file %s from bucket %s", fileID, bucketName)
+
+	out, err := s3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(fileID),
+	})
+	if err != nil {
+		logger.Errorf("Failed to download file from S3: %v", err)
+		return err
+	}
+	defer out.Body.Close()
+
+	n, err := io.Copy(stream, out.Body)
+	if err != nil {
+		logger.Errorf("Error while sending file to client: %v", err)
+		return err
+	}
+
+	logger.Infof("File %s (%d bytes) sent successfully to client", fileID, n)
+	return nil
+}
+
+func remove(fileID string) error {
 	_, err := s3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
 		Bucket: aws.String(bucketName),
 		Key:    aws.String(fileID),
