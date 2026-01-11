@@ -460,9 +460,7 @@ func cleanupLoop() error {
 				}
 
 				for _, c := range clients {
-					if err := json.NewEncoder(c.Stream).Encode(msg); err != nil {
-						logger.Errorf("Error broadcasting user list to stream %s: %v", c.PeerID, err)
-					}
+					json.NewEncoder(c.Stream).Encode(msg)
 				}
 			} else if len(clients) == 0 {
 				logger.Infof("Removing empty channel %s", channelID)
