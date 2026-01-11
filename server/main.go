@@ -311,6 +311,8 @@ func initS3() {
 		o.BaseEndpoint = aws.String("https://52734793e62aadf91e3bc988c6d667cc.eu.r2.cloudflarestorage.com")
 		o.Region = "auto"
 		// o.UsePathStyle = true
+		o.RequestChecksumCalculation = aws.RequestChecksumCalculationWhenRequired
+  	o.ResponseChecksumValidation = aws.ResponseChecksumValidationWhenRequired
 	})
 
 	logger.Info("S3 client initialised")
