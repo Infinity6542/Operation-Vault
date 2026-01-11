@@ -44,8 +44,8 @@ var bucketName = "opvault-test"
 
 // * Structs
 type Client struct {
-	Stream *webtransport.Stream
-	PeerID string
+	Stream   *webtransport.Stream
+	PeerID   string
 	LastSeen time.Time
 }
 
@@ -53,7 +53,7 @@ type Message struct {
 	Type      string `json:"type"`
 	ChannelID string `json:"channel_id"`
 	Payload   string `json:"payload"`
-	SenderID	string `json:"sender_id"`
+	SenderID  string `json:"sender_id"`
 }
 
 type Hub struct {
@@ -187,7 +187,7 @@ func handleStream(stream *webtransport.Stream) {
 			logger.Errorf("Error decoding message: %v", err)
 		}
 		return
-	}	
+	}
 
 	switch msg.Type {
 	case "upload":
@@ -216,14 +216,14 @@ func handleStream(stream *webtransport.Stream) {
 	case "join":
 		logger.Infof("Client %s joining channel: %s", msg.SenderID, msg.ChannelID)
 		hub.Lock()
-	
+
 		if _, ok := hub.Channels[msg.ChannelID]; !ok {
 			hub.Channels[msg.ChannelID] = make(map[string]*Client)
 		}
 
 		hub.Channels[msg.ChannelID][msg.SenderID] = &Client{
-			Stream: stream,
-			PeerID: msg.SenderID,
+			Stream:   stream,
+			PeerID:   msg.SenderID,
 			LastSeen: time.Now(),
 		}
 		hub.Unlock()
@@ -250,22 +250,22 @@ func handleStream(stream *webtransport.Stream) {
 		}
 		hub.Unlock()
 
-	//TODO: Improve and consolidate where logs are output.
-	// Currently, some logs are handled in the switch cases while others are handled
-	// within the functions. Ideally, the logs should be handled within the functions
-	// I think? I'd make it easier to reuse the functions this way so I this is the
-	// way to go.
-	switch msg.Type {
-	case "join":
-		logger.Info("Join?")
-	case "message":
-		logger.Infof("Message received for channel %s: %s", msg.ChannelID, msg.Payload)
-		broadcast(msg, stream)
-	case "heartbeat":
-		logger.Infof("Heartbeat received from %s in channel %s", msg.SenderID, msg.ChannelID)
-	default:
-		broadcast(msg, stream)
-	}
+		//TODO: Improve and consolidate where logs are output.
+		// Currently, some logs are handled in the switch cases while others are handled
+		// within the functions. Ideally, the logs should be handled within the functions
+		// I think? I'd make it easier to reuse the functions this way so I this is the
+		// way to go.
+		switch msg.Type {
+		case "join":
+			logger.Info("Join?")
+		case "message":
+			logger.Infof("Message received for channel %s: %s", msg.ChannelID, msg.Payload)
+			broadcast(msg, stream)
+		case "heartbeat":
+			logger.Infof("Heartbeat received from %s in channel %s", msg.SenderID, msg.ChannelID)
+		default:
+			broadcast(msg, stream)
+		}
 	}
 }
 
@@ -360,7 +360,7 @@ func initS3() {
 		o.Region = "auto"
 		// o.UsePathStyle = true
 		o.RequestChecksumCalculation = aws.RequestChecksumCalculationWhenRequired
-  	o.ResponseChecksumValidation = aws.ResponseChecksumValidationWhenRequired
+		o.ResponseChecksumValidation = aws.ResponseChecksumValidationWhenRequired
 	})
 
 	logger.Info("S3 client initialised")
@@ -497,7 +497,7 @@ func broadcastUserList(channelID string) error {
 	msg := Message{
 		Type:      "user_list",
 		ChannelID: channelID,
-		SenderID: "Server",
+		SenderID:  "Server",
 		Payload:   string(listJSON),
 	}
 
