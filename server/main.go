@@ -43,19 +43,26 @@ var s3Client *s3.Client
 var bucketName = "opvault-test"
 
 // * Structs
+type Client struct {
+	Stream *webtransport.Stream
+	PeerID string
+	LastSeen time.Time
+}
+
 type Message struct {
 	Type      string `json:"type"`
 	ChannelID string `json:"channel_id"`
 	Payload   string `json:"payload"`
+	SenderID	string `json:"sender_id"`
 }
 
 type Hub struct {
 	sync.RWMutex
-	Channels map[string][]*webtransport.Stream
+	Channels map[string]map[string]*Client
 }
 
 var hub = Hub{
-	Channels: make(map[string][]*webtransport.Stream),
+	Channels: make(map[string]map[string]*Client),
 }
 
 // Ignore redeclared warning, test_client is only temporary
@@ -145,6 +152,8 @@ func main() {
 		}
 	}()
 
+	go cleanupLoop()
+
 	wg.Wait()
 }
 
@@ -205,10 +214,20 @@ func handleStream(stream *webtransport.Stream) {
 		remove(msg.Payload)
 		return
 	case "join":
-		logger.Infof("Client joining channel: %s", msg.ChannelID)
+		logger.Infof("Client %s joining channel: %s", msg.SenderID, msg.ChannelID)
 		hub.Lock()
-		hub.Channels[msg.ChannelID] = append(hub.Channels[msg.ChannelID], stream)
+	
+		if _, ok := hub.Channels[msg.ChannelID]; !ok {
+			hub.Channels[msg.ChannelID] = make(map[string]*Client)
+		}
+
+		hub.Channels[msg.ChannelID][msg.SenderID] = &Client{
+			Stream: stream,
+			PeerID: msg.SenderID,
+			LastSeen: time.Now(),
+		}
 		hub.Unlock()
+		broadcastUserList(msg.ChannelID)
 	default:
 		broadcast(msg, stream)
 	}
@@ -222,6 +241,15 @@ func handleStream(stream *webtransport.Stream) {
 			}
 			break
 		}
+
+		hub.Lock()
+		if clients, ok := hub.Channels[msg.ChannelID]; ok {
+			if client, ok := clients[msg.SenderID]; ok {
+				client.LastSeen = time.Now()
+			}
+		}
+		hub.Unlock()
+
 	//TODO: Improve and consolidate where logs are output.
 	// Currently, some logs are handled in the switch cases while others are handled
 	// within the functions. Ideally, the logs should be handled within the functions
@@ -231,8 +259,10 @@ func handleStream(stream *webtransport.Stream) {
 	case "join":
 		logger.Info("Join?")
 	case "message":
-			logger.Infof("Message received for channel %s: %s", msg.ChannelID, msg.Payload)
-			broadcast(msg, stream)
+		logger.Infof("Message received for channel %s: %s", msg.ChannelID, msg.Payload)
+		broadcast(msg, stream)
+	case "heartbeat":
+		logger.Infof("Heartbeat received from %s in channel %s", msg.SenderID, msg.ChannelID)
 	default:
 		broadcast(msg, stream)
 	}
@@ -243,7 +273,7 @@ func broadcast(msg Message, sender *webtransport.Stream) {
 	hub.RLock()
 	defer hub.RUnlock()
 
-	streams, ok := hub.Channels[msg.ChannelID]
+	clients, ok := hub.Channels[msg.ChannelID]
 	if !ok {
 		logger.Warnf("No clients in channel %s to broadcast message.", msg.ChannelID)
 		return
@@ -252,14 +282,14 @@ func broadcast(msg Message, sender *webtransport.Stream) {
 	// Legacy
 	// data, _ := json.Marshal(msg)
 
-	for _, s := range streams {
-		if s == sender {
+	for _, c := range clients {
+		if c.Stream == sender {
 			continue // Skip sender
 		}
 		// Legacy
 		// _, err := s.Write(data)
-		if err := json.NewEncoder(s).Encode(msg); err != nil {
-			logger.Errorf("Error broadcasting to stream %d: %v", s.StreamID(), err)
+		if err := json.NewEncoder(c.Stream).Encode(msg); err != nil {
+			logger.Errorf("Error broadcasting to stream %d: %v", c.PeerID, err)
 		}
 	}
 }
@@ -391,5 +421,90 @@ func remove(fileID string) error {
 		return err
 	}
 	logger.Infof("File %s deleted successfully from bucket %s", fileID, bucketName)
+	return nil
+}
+
+func cleanupLoop() error {
+	ticker := time.NewTicker(20 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		hub.Lock()
+		for channelID, clients := range hub.Channels {
+			changed := false
+			for peerID, client := range clients {
+				if time.Since(client.LastSeen) > 20 * time.Second {
+					logger.Infof("Removing inactive client %s from channel %s", peerID, channelID)
+					client.Stream.CancelRead(0)
+					delete(clients, peerID)
+					changed = true
+				}
+			}
+
+			if changed && len(clients) > 0 {
+				var userList []string
+				for _, c := range clients {
+					userList = append(userList, c.PeerID)
+				}
+				listJSON, err := json.Marshal(userList)
+				if err != nil {
+					logger.Errorf("Failed to marshal user list: %v", err)
+					continue
+				}
+
+				msg := Message{
+					Type:      "user_list",
+					ChannelID: channelID,
+					SenderID: "Server",
+					Payload:   string(listJSON),
+				}
+
+				for _, c := range clients {
+					if err := json.NewEncoder(c.Stream).Encode(msg); err != nil {
+						logger.Errorf("Error broadcasting user list to stream %s: %v", c.PeerID, err)
+					}
+				}
+			} else if len(clients) == 0 {
+				logger.Infof("Removing empty channel %s", channelID)
+				delete(hub.Channels, channelID)
+			}
+		}
+		hub.Unlock()
+	}
+	return nil
+}
+
+func broadcastUserList(channelID string) error {
+	hub.RLock()
+	clients := hub.Channels[channelID]
+	hub.RUnlock()
+
+	var userList []string
+	for _, client := range clients {
+		userList = append(userList, client.PeerID)
+	}
+
+	listJSON, err := json.Marshal(userList)
+	if err != nil {
+		logger.Errorf("Failed to marshal user list: %v", err)
+		return err
+	}
+
+	msg := Message{
+		Type:      "user_list",
+		ChannelID: channelID,
+		SenderID: "Server",
+		Payload:   string(listJSON),
+	}
+
+	hub.RLock()
+	defer hub.RUnlock()
+
+	for _, c := range hub.Channels[channelID] {
+		if err := json.NewEncoder(c.Stream).Encode(msg); err != nil {
+			logger.Errorf("Error broadcasting user list to stream %s: %v", c.PeerID, err)
+			return err
+		}
+	}
 	return nil
 }
