@@ -433,38 +433,44 @@ func cleanupLoop() error {
 		for channelID, clients := range hub.Channels {
 			changed := false
 			for peerID, client := range clients {
-				if time.Since(client.LastSeen) > 20 * time.Second {
-					logger.Infof("Removing inactive client %s from channel %s", peerID, channelID)
-					client.Stream.CancelRead(0)
-					delete(clients, peerID)
-					changed = true
-				}
-			}
-
-			if changed && len(clients) > 0 {
-				var userList []string
-				for _, c := range clients {
-					userList = append(userList, c.PeerID)
-				}
-				listJSON, err := json.Marshal(userList)
-				if err != nil {
-					logger.Errorf("Failed to marshal user list: %v", err)
+				if time.Since(client.LastSeen) <= 20*time.Second {
 					continue
 				}
+				logger.Infof("Removing inactive client %s from channel %s", peerID, channelID)
+				client.Stream.CancelRead(0)
+				delete(clients, peerID)
+				changed = true
+			}
 
-				msg := Message{
-					Type:      "user_list",
-					ChannelID: channelID,
-					SenderID: "Server",
-					Payload:   string(listJSON),
-				}
-
-				for _, c := range clients {
-					json.NewEncoder(c.Stream).Encode(msg)
-				}
-			} else if len(clients) == 0 {
+			if len(clients) == 0 {
 				logger.Infof("Removing empty channel %s", channelID)
 				delete(hub.Channels, channelID)
+				continue
+			}
+
+			if !changed {
+				continue
+			}
+
+			var userList []string
+			for _, c := range clients {
+				userList = append(userList, c.PeerID)
+			}
+			listJSON, err := json.Marshal(userList)
+			if err != nil {
+				logger.Errorf("Failed to marshal user list: %v", err)
+				continue
+			}
+
+			msg := Message{
+				Type:      "user_list",
+				ChannelID: channelID,
+				SenderID:  "Server",
+				Payload:   string(listJSON),
+			}
+
+			for _, c := range clients {
+				json.NewEncoder(c.Stream).Encode(msg)
 			}
 		}
 		hub.Unlock()
