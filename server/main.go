@@ -179,7 +179,8 @@ func handleStream(stream *webtransport.Stream) {
 		return
 	}
 
-	if msg.Type == "upload" {
+	switch msg.Type {
+	case "upload":
 		logger.Infof("Upload request received for file ID: %s", msg.Payload)
 		multiReader := io.MultiReader(decoder.Buffered(), stream)
 
@@ -189,15 +190,14 @@ func handleStream(stream *webtransport.Stream) {
 		} else {
 			logger.Infof("Upload successful for file ID %s", msg.Payload)
 		}
-		return
-	}
-
-	if msg.Type == "join" {
+	case "download":
+		download(stream, msg.Payload)
+	case "join":
 		logger.Infof("Client joining channel: %s", msg.ChannelID)
 		hub.Lock()
 		hub.Channels[msg.ChannelID] = append(hub.Channels[msg.ChannelID], stream)
 		hub.Unlock()
-	} else {
+	default:
 		broadcast(msg, stream)
 	}
 
@@ -333,5 +333,18 @@ func upload(stream io.Reader, fileID string) error {
 	}
 
 	logger.Infof("File %s uploaded successfully to bucket %s", fileID, bucketName)
+	return nil
+}
+
+func delete(fileID string) error {
+	_, err := s3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(fileID),
+	})
+	if err != nil {
+		logger.Errorf("Failed to delete file from S3: %v", err)
+		return err
+	}
+	logger.Infof("File %s deleted successfully from bucket %s", fileID, bucketName)
 	return nil
 }
