@@ -450,7 +450,7 @@ func cleanupLoop() error {
 					continue
 				}
 				logger.Infof("Removing inactive client %s from channel %s", peerID, channelID)
-				client.Stream.CancelRead(0)
+				// client.Stream.CancelRead(0)
 				delete(clients, peerID)
 				changed = true
 			}
