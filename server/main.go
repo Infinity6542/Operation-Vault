@@ -257,7 +257,20 @@ func handleStream(stream *webtransport.Stream) {
 		// way to go.
 		switch msg.Type {
 		case "join":
-			logger.Info("Join?")
+			logger.Infof("Client %s joining channel: %s", msg.SenderID, msg.ChannelID)
+			hub.Lock()
+	
+			if _, ok := hub.Channels[msg.ChannelID]; !ok {
+				hub.Channels[msg.ChannelID] = make(map[string]*Client)
+			}
+	
+			hub.Channels[msg.ChannelID][msg.SenderID] = &Client{
+				Stream:   stream,
+				PeerID:   msg.SenderID,
+				LastSeen: time.Now(),
+			}
+			hub.Unlock()
+			broadcastUserList(msg.ChannelID)
 		case "message":
 			logger.Infof("Message received for channel %s: %s", msg.ChannelID, msg.Payload)
 			broadcast(msg, stream)
