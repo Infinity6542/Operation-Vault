@@ -256,14 +256,15 @@ func handleStream(stream *webtransport.Stream) {
 		// I think? I'd make it easier to reuse the functions this way so I this is the
 		// way to go.
 		switch msg.Type {
+		// Joining a share channel
 		case "join":
 			logger.Infof("Client %s joining channel: %s", msg.SenderID, msg.ChannelID)
 			hub.Lock()
-	
+
 			if _, ok := hub.Channels[msg.ChannelID]; !ok {
 				hub.Channels[msg.ChannelID] = make(map[string]*Client)
 			}
-	
+
 			hub.Channels[msg.ChannelID][msg.SenderID] = &Client{
 				Stream:   stream,
 				PeerID:   msg.SenderID,
