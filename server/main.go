@@ -65,6 +65,10 @@ var hub = Hub{
 	Channels: make(map[string]map[string]*Client),
 }
 
+// Track file ownership: shareId -> senderId
+var fileOwners = make(map[string]string)
+var fileOwnersMu sync.RWMutex
+
 // Ignore redeclared warning, test_client is only temporary
 func main() {
 	rawLogger, _ := zap.NewDevelopment()
@@ -200,18 +204,44 @@ func handleStream(stream *webtransport.Stream) {
 			logger.Warnf("Expected newline after JSON message, got: %v", rm[0])
 		}
 
-		err := upload(multiReader, msg.Payload)
+		err := upload(multiReader, msg.Payload, msg.SenderID)
 		if err != nil {
 			logger.Errorf("Upload failed for file ID %s: %v", msg.Payload, err)
 		} else {
-			logger.Infof("Upload successful for file ID %s", msg.Payload)
+			fileOwnersMu.Lock()
+			fileOwners[msg.Payload] = msg.SenderID
+			fileOwnersMu.Unlock()
+			logger.Infof("Upload successful for file ID %s (owner: %s)", msg.Payload, msg.SenderID)
 		}
 		return
 	case "download":
 		download(stream, msg.Payload)
 		return
 	case "remove":
-		remove(msg.Payload)
+		fileOwnersMu.RLock()
+		owner, exists := fileOwners[msg.Payload]
+		fileOwnersMu.RUnlock()
+
+		if !exists {
+			owner, exists = getFileOwner(msg.Payload)
+			if exists {
+				fileOwnersMu.Lock()
+				fileOwners[msg.Payload] = owner
+				fileOwnersMu.Unlock()
+			}
+		}
+
+		if !exists {
+			logger.Warnf("No owner recorded for file %s, allowing delete", msg.Payload)
+			remove(msg.Payload)
+		} else if owner == msg.SenderID {
+			remove(msg.Payload)
+			fileOwnersMu.Lock()
+			delete(fileOwners, msg.Payload)
+			fileOwnersMu.Unlock()
+		} else {
+			logger.Warnf("Unauthorized delete attempt for file %s by %s (owner: %s)", msg.Payload, msg.SenderID, owner)
+		}
 		return
 	case "join":
 		logger.Infof("Client %s joining channel: %s", msg.SenderID, msg.ChannelID)
@@ -389,7 +419,7 @@ func initS3() {
 	logger.Info("S3 client initialised")
 }
 
-func upload(stream io.Reader, fileID string) error {
+func upload(stream io.Reader, fileID string, ownerID string) error {
 	data, err := io.ReadAll(stream)
 	if err != nil {
 		logger.Errorf("Failed to read data from stream: %v", err)
@@ -397,9 +427,10 @@ func upload(stream io.Reader, fileID string) error {
 	}
 
 	_, err = s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
-		Bucket: aws.String(bucketName),
-		Key:    aws.String(fileID),
-		Body:   bytes.NewReader(data),
+		Bucket:   aws.String(bucketName),
+		Key:      aws.String(fileID),
+		Body:     bytes.NewReader(data),
+		Metadata: map[string]string{"owner": ownerID},
 	})
 
 	if err != nil {
@@ -409,6 +440,24 @@ func upload(stream io.Reader, fileID string) error {
 
 	logger.Infof("File %s uploaded successfully to bucket %s", fileID, bucketName)
 	return nil
+}
+
+func getFileOwner(fileID string) (string, bool) {
+	head, err := s3Client.HeadObject(context.TODO(), &s3.HeadObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(fileID),
+	})
+	if err != nil {
+		logger.Debugf("Failed to get metadata for file %s: %v", fileID, err)
+		return "", false
+	}
+
+	if owner, ok := head.Metadata["owner"]; ok {
+		logger.Debugf("Found owner %s for file %s from S3 metadata", owner, fileID)
+		return owner, true
+	}
+
+	return "", false
 }
 
 func download(stream *webtransport.Stream, fileID string) error {
