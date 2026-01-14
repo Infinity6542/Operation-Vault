@@ -6,3 +6,4 @@ plugin/main.js
 .wakatime-project
 **/*.txt
 server/op-vault-server
+.vscode/*
