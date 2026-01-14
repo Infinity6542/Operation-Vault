@@ -276,8 +276,17 @@ func handleStream(stream *webtransport.Stream) {
 			logger.Infof("Message received for channel %s: %s", msg.ChannelID, msg.Payload)
 			broadcast(msg, stream)
 		case "heartbeat":
-			logger.Infof("Heartbeat received from %s in channel %s", msg.SenderID, msg.ChannelID)
+			// Way too annoying lol, removing the logs and doing nothing instead
+			// logger.Infof("Heartbeat received from %s in channel %s", msg.SenderID, msg.ChannelID)
+		case "leave":
+			logger.Infof("Client %s leaving channel: %s", msg.SenderID, msg.ChannelID)
+			hub.Lock()
+			delete(hub.Channels[msg.ChannelID], msg.SenderID)
+			hub.Unlock()
+			broadcastUserList(msg.ChannelID)
+			return
 		default:
+			logger.Infof("Message of misc type '%s' received for channel %s", msg.Type, msg.ChannelID)
 			broadcast(msg, stream)
 		}
 	}
