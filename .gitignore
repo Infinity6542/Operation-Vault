@@ -7,3 +7,4 @@ plugin/main.js
 **/*.txt
 server/op-vault-server
 .vscode/*
+docs
