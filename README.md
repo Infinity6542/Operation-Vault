@@ -12,9 +12,27 @@ The objective is to transform an Obsidian vault into something that has similar 
 ### Multiplayer
 OpVault will utilise a relayed P2P (peer-to-peer) system. Below is a good diagram of what’s happening:
 ```mermaid
-flowchart LR
-	A[Host 1 updates & processing]-->B[Relay server receive & dispatch]
-	B-->C[Client receive & process updates]
+sequenceDiagram
+    par P1 Connecting
+        Peer 1->>Server: Connects to server
+        Peer 1->>Server: Joins master channel
+    and P2 Connecting
+        Peer 2->>Server: Connects to server
+        Peer 2->>Server: Joins master channel
+    end
+    Peer 1->>Server: Creates UUID for file and joins channel
+    Peer 1->>Server: A .yjs and manifest.json file is sent for upload
+    Peer 2->>Server: Joins channel with UUID
+    Server->>Peer 1: Notification of Peer 2 joining (updated list)
+    Peer 2->>Server: Requests file either from peer/cloud
+    Server->>Peer 2: Manifest, Yjs and file are sent back
+    par Updates P1->P2
+        Peer 1->>Server: sync_update and awareness packets are sent
+        Server->>Peer 2: Updates to file and awareness relayed
+    and Updates P2->P1
+        Peer 2->>Server: sync_update and awareness packets are sent
+        Server->>Peer 1: Updates to file and awareness relayed
+    end
 ```
 Of course, it’s a lot more complicated than this. Hopefully there’ll be documentation at some stage as to what “processing” actually means, but the server also observes which clients it should forward the data to rather than blindly firing data at every device connected to it.
 
@@ -25,8 +43,8 @@ Anyway, multiplayer functionality will have these features:
 	- No account registration required (yippee!)
 	- Begin sharing in 1 click (generate link)
 	- Begin collaborating in 2 clicks (click link + confirm nickname)
-- Data encrypted with key pairs
-- Ridiculously fast updates with minimal data transfer
+- Encrypted data both in trasit and at rest (cloud)
+- Fast updates with minimal data transfer
 - Simple web UI for non-Obsidian users
 	- Comes with KaTeX, Excalidraw, Canvas, etc. rendering support!
 
@@ -49,7 +67,7 @@ This is a pretty large stack, so bear with me for a sec…
 ### Plugin
 This component is responsible for working as both a host and a guest switching the two. It should be able to transmit/receive updates, including cursor positions as well as file deltas. It should be able to calculate deltas when transmitting and apply them when receiving. If the plugin is acting as a host, it should also be checking for any redaction or freezing rules that should be applied.
 - TypeScript
-	- Yjs (CRDT things)
+	- Yjs (CRDT things) and fast-diff
 	- CodeMirror integration
 ### Web Client
 This component will be used by people who don’t have Obsidian or are viewing a hosted version.
