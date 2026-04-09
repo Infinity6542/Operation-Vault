@@ -265,6 +265,9 @@ export default class OpVaultPlugin extends Plugin implements IOpVaultPlugin {
             (g) => g.id === group,
           );
           if (!syncGroup) continue;
+          if (syncGroup.files.some(f => f.path === file.path)) {
+            continue;
+          }
           let shareItem = {
             id: generateUUID(),
             path: file.path,
