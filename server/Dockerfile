@@ -21,7 +21,7 @@ COPY --from=builder /app/opvault-server .
 
 RUN mkdir -p /app/certs
 
-EXPOSE 8080/tcp
-EXPOSE 8080/udp
+EXPOSE 7200/tcp
+EXPOSE 7200/udp
 
 CMD ["./opvault-server"]
