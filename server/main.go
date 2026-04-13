@@ -77,7 +77,7 @@ func main() {
 	defer rawLogger.Sync()
 	logger = rawLogger.Sugar()
 
-	addr := ":8080"
+	addr := ":7200"
 
 	tlsCert, fingerprint := certHandler()
 
@@ -123,7 +123,7 @@ func main() {
 	// Static file server for client
 	clientFS, _ := fs.Sub(embedFS, "embed_client")
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Alt-Svc", `h3=":8080"; ma=2592000`)
+		w.Header().Set("Alt-Svc", `h3=":7200"; ma=2592000`)
 		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
 			serveIndex(w, clientFS)
 		} else {
@@ -358,7 +358,7 @@ func serveIndex(w http.ResponseWriter, fsys fs.FS) {
 	defer f.Close()
 	content, _ := io.ReadAll(f)
 	html := string(content)
-	html = strings.Replace(html, "{{BASE}}", "https://127.0.0.1:8080", 1)
+	html = strings.Replace(html, "{{BASE}}", "https://127.0.0.1:7200", 1)
 	w.Header().Set("Content-Type", "text/html")
 	w.Write([]byte(html))
 }
