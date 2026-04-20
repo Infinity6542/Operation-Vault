@@ -69,6 +69,13 @@ export default class OpVaultPlugin extends Plugin implements IOpVaultPlugin {
     console.debug("[OPV] Loading client...");
     await this.loadSettings();
 
+    // Migration to safer URL
+    if (this.settings.serverUrl && this.settings.serverUrl == "https://opal.jchen.au:8080/ws") {
+      this.settings.serverUrl = "https://opal.jchen.au:7200/ws";
+      await this.saveSettings();
+      new Notice("You were successfully migrated to the new server endpoint.");
+    }
+
     if (!this.settings.senderId) {
       this.settings.senderId = generateUUID();
       await this.saveSettings();
