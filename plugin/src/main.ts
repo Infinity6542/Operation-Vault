@@ -488,14 +488,23 @@ class vaultSettingsTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Global channel name")
       .setDesc("The default broadcast channel.")
-      .addText((text) =>
+      .addText((text) => {
+        const prevValue = this.plugin.settings.channelName;
         text
           .setPlaceholder("Vault-1")
           .setValue(this.plugin.settings.channelName)
           .onChange(async (value) => {
-            this.plugin.settings.channelName = value;
+            const response: boolean = await ConfirmModal.display(this.app, "Change server endpoint?", "Are you sure you want to change the global channel? This WILL affect connectivity with other clients. ONLY DO THIS IF YOU KNOW WHAT YOU ARE DOING.", true);
+            if (response) {
+              this.plugin.settings.channelName = value;
+              await this.plugin.saveSettings();
+              this.display();
+            } else {
+              text.setValue(prevValue);
+            }
             await this.plugin.saveSettings();
-          }),
+          })
+      }
       );
 
     new Setting(containerEl)
