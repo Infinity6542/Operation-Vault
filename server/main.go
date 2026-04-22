@@ -103,6 +103,8 @@ func main() {
 				InitialPacketSize:       1200,
 				DisablePathMTUDiscovery: true,
 				EnableDatagrams:         true,
+				MaxIdleTimeout:          2 * time.Minute,
+				KeepAlivePeriod:         20 * time.Second,
 			},
 		},
 		CheckOrigin: func(r *http.Request) bool { return true },
