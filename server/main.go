@@ -572,7 +572,7 @@ func remove(channelID string) error {
 }
 
 func cleanupLoop() error {
-	ticker := time.NewTicker(20 * time.Second)
+	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
 	for range ticker.C {
