@@ -40,7 +40,7 @@ var embedFS embed.FS
 var logger *zap.SugaredLogger
 var s3Client *s3.Client
 
-var bucketName = "opvault-test"
+var bucketName = os.Getenv("S3_BUCKET")
 
 // * Structs
 type Client struct {
@@ -441,6 +441,15 @@ func certHandler() (tls.Certificate, string) {
 }
 
 func initS3() {
+	endpoint := os.Getenv("S3_ENDPOINT")
+	if endpoint == "" {
+		logger.Fatal("Failed to get an S3 endpoint. Check your env variables! (S3_ENDPOINT)")
+	}
+
+	if bucketName == "" {
+		logger.Fatal("Failed to get an S3 bucket name. Check your env variables! (S3_BUCKET)")
+	}
+
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		logger.Fatalf("Unable to load AWS SDK config, %v", err)
