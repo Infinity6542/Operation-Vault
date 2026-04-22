@@ -347,7 +347,7 @@ func broadcast(msg Message, sender *webtransport.Stream) {
 		// Legacy
 		// _, err := s.Write(data)
 		if err := json.NewEncoder(c.Stream).Encode(msg); err != nil {
-			logger.Errorf("Error broadcasting to stream %d: %v", c.PeerID, err)
+			logger.Errorf("Error broadcasting to stream %s: %v", c.PeerID, err)
 		}
 	}
 }
