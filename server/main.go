@@ -304,6 +304,7 @@ func handleStream(stream *webtransport.Stream) {
 			hub.Channels[msg.ChannelID][msg.SenderID] = &Client{
 				Stream:   stream,
 				PeerID:   msg.SenderID,
+				Nickname: msg.Nickname,
 				LastSeen: time.Now(),
 			}
 			hub.Unlock()
