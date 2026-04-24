@@ -19,7 +19,6 @@
     "@typescript-eslint/eslint-plugin": "^8.52.0",
     "@typescript-eslint/parser": "^8.52.0",
     "builtin-modules": "^5.0.0",
-		"eslint-plugin-obsidianmd": "0.1.9",
     "esbuild": "^0.27.2",
     "eslint": "^9.39.2",
     "eslint-plugin-obsidianmd": "^0.1.9",
