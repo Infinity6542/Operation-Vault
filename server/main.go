@@ -477,7 +477,7 @@ func initS3() {
 	}
 
 	s3Client = s3.NewFromConfig(cfg, func(o *s3.Options) {
-		o.BaseEndpoint = aws.String("https://52734793e62aadf91e3bc988c6d667cc.eu.r2.cloudflarestorage.com")
+		o.BaseEndpoint = aws.String(endpoint)
 		o.Region = "auto"
 		// o.UsePathStyle = true
 		o.RequestChecksumCalculation = aws.RequestChecksumCalculationWhenRequired
