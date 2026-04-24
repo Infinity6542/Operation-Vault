@@ -22,6 +22,7 @@ export default defineConfig([
 
     // Optional project overrides
     rules: {
+      "@typescript-eslint/restrict-template-expressions": "off",
       "obsidianmd/ui/sentence-case": [
         "warn",
         {
