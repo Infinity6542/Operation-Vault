@@ -5,7 +5,7 @@ import obsidianmd from "eslint-plugin-obsidianmd";
 import globals from "globals";
 
 export default defineConfig([
-  ...obsidianmd.configs.recommended,
+  ...obsidianmd.configs.recommendedTypeChecked,
   // Or include English locale files (JSON and TS/JS modules)
   // ...obsidianmd.configs.recommendedWithLocalesEn,
 
