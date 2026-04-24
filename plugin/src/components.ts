@@ -9,7 +9,7 @@ import {
   TFile,
   Setting,
   ButtonComponent,
-  // stringifyYaml,
+  ObsidianProtocolData,
 } from "obsidian";
 import {
   opError,
@@ -214,15 +214,14 @@ export class ShareModal extends Modal {
           if (this.mode === "file") {
             id = await this.createShare();
           } else {
-            id = await this.createSyncGroup(this.item);
+            id = await this.createSyncGroup(this.item, this.pin);
           }
           if (!(id && typeof id === "string"))
             return new Notice("Failed to create share.");
-          const link = `obsidian://opv?action=join&id=${id}`;
+          let link = `obsidian://opv?action=join&id=${id}${this.mode === "group" ? "&group=true" : ""}`;
           await navigator.clipboard.writeText(link);
           new Notice(
-            `Shared ${id}. The ${this.mode === "file" ? "share ID" : "group ID"
-            } has been copied to your clipboard.`,
+            `Shared ${id}. The link has been copied to your clipboard.`,
           );
           this.close();
         });
@@ -238,7 +237,7 @@ export class ShareModal extends Modal {
           if (this.mode === "file") {
             id = await this.createShare();
           } else {
-            id = await this.createSyncGroup(this.item);
+            id = await this.createSyncGroup(this.item, this.pin);
           }
           if (!(id && typeof id === "string"))
             return new Notice("Failed to create share.");
@@ -259,7 +258,7 @@ export class ShareModal extends Modal {
       return;
     }
     if (this.mode === "group") {
-      await this.createSyncGroup(this.item);
+      await this.createSyncGroup(this.item, this.pin);
     } else {
       const file = this.app.vault.getAbstractFileByPath(this.item);
       if (!(file instanceof TFile)) {
@@ -286,18 +285,19 @@ export class ShareModal extends Modal {
         this.plugin.settings.senderId,
         this.plugin.settings.nickname,
       );
-      console.debug(`joined channel ${newShare.id} after sharing`);
+      console.debug(`[OPV] Joined channel ${newShare.id} after sharing`);
       await this.plugin.syncHandler.startSync(file);
       return newShare.id;
     }
   }
 
-  async createSyncGroup(id: string): Promise<void | string | opError> {
+  async createSyncGroup(id: string, pin: string): Promise<void | string | opError> {
     const allFiles = this.app.vault.getFiles();
     const matches: TFile[] = [];
     const group: SyncGroup = {
       id: id,
       files: [],
+      pin: pin,
     };
     // Check for server connection
     if (!this.plugin.activeWriter || !this.plugin.activeTransport)
@@ -396,7 +396,6 @@ export class ShareModal extends Modal {
 }
 export class DownloadModal extends Modal {
   plugin: OpVaultPlugin;
-  group?: string;
   shareId?: string;
   pin: string = "";
   mode: "file" | "group" = "file";
@@ -404,12 +403,15 @@ export class DownloadModal extends Modal {
   constructor(
     app: App,
     plugin: OpVaultPlugin,
-    defaultId?: string,
+    params?: ObsidianProtocolData,
     // defaultPin?: string,
   ) {
     super(app);
     this.plugin = plugin;
-    this.shareId = defaultId;
+    if (params) {
+      this.shareId = params.id;
+      this.mode = params.group === "true" ? "group" : "file";
+    }
   }
 
   onOpen() {
