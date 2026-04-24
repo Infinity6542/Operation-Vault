@@ -471,6 +471,10 @@ func initS3() {
 		logger.Fatal("Failed to get an S3 bucket name. Check your env variables! (S3_BUCKET)")
 	}
 
+	if os.Getenv("AWS_ACCESS_KEY_ID") == "" || os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
+		logger.Fatal("Failed to get S3 auth credits. Check your env variables!")
+	}
+
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		logger.Fatalf("Unable to load AWS SDK config, %v", err)
