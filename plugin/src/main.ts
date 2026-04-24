@@ -30,7 +30,7 @@ const defaultSettings: PluginSettings = {
   encryptionKey: "default",
   senderId: "",
   sharedItems: [],
-  inboxPath: "",
+  inboxPath: "/",
   syncGroups: [],
   nickname: "",
   devMode: false,
