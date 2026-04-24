@@ -130,7 +130,7 @@ export class ShareModal extends Modal {
       .setDesc("Share a single file or multiple?")
       .addDropdown((e) => {
         e.addOption("file", "Single file")
-          .addOption("folder", "Sync group")
+          .addOption("group", "Sync group")
           .setValue(this.mode)
           .onChange((value) => {
             this.mode = value as "file" | "group";
