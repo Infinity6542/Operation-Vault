@@ -183,7 +183,23 @@ func handleWebTransport(conn *webtransport.Session) {
 
 // conn *webtransport.Session is currently unused and placed in this comment instead of an argument
 func handleStream(stream *webtransport.Stream) {
-	defer stream.Close()
+	var channelID, senderID string
+	defer func() {
+		if channelID != "" && senderID != "" {
+			logger.Infof("Cleaning up disconnected client %s and client %s", senderID, channelID)
+			hub.Lock()
+			if channel, ok := hub.Channels[channelID]; ok {
+				delete(channel, senderID)
+				if len(channel) == 0 {
+					delete(hub.Channels, channelID)
+				}
+			}
+			hub.Unlock()
+
+			broadcastUserList(channelID)
+		}
+		stream.Close()
+	}()
 
 	decoder := json.NewDecoder(stream)
 
@@ -250,6 +266,8 @@ func handleStream(stream *webtransport.Stream) {
 		return
 	case "join":
 		logger.Infof("Client %s joining channel: %s", msg.SenderID, msg.ChannelID)
+		channelID = msg.ChannelID
+		senderID = msg.SenderID
 		hub.Lock()
 
 		if _, ok := hub.Channels[msg.ChannelID]; !ok {
