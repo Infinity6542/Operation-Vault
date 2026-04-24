@@ -216,8 +216,10 @@ export class ShareModal extends Modal {
           } else {
             id = await this.createSyncGroup(this.item, this.pin);
           }
-          if (!(id && typeof id === "string"))
-            return new Notice("Failed to create share.");
+          if (!(id && typeof id === "string")) {
+            new Notice("Failed to create share.");
+            return;
+          }
           let link = `obsidian://opv?action=join&id=${id}${this.mode === "group" ? "&group=true" : ""}`;
           await navigator.clipboard.writeText(link);
           new Notice(
@@ -239,8 +241,10 @@ export class ShareModal extends Modal {
           } else {
             id = await this.createSyncGroup(this.item, this.pin);
           }
-          if (!(id && typeof id === "string"))
-            return new Notice("Failed to create share.");
+          if (!(id && typeof id === "string")) {
+            new Notice("Failed to create share.");
+            return;
+          }
           await navigator.clipboard.writeText(id);
           new Notice(
             `Shared ${id}. The ${this.mode === "file" ? "share ID" : "group ID"
@@ -346,6 +350,10 @@ export class ShareModal extends Modal {
           groups: [id],
         };
         this.plugin.settings.sharedItems.push(shareItem);
+        if (this.upload) {
+          await upload(file, this.plugin, shareItem.id, shareItem.key);
+        }
+        await this.plugin.syncHandler.startSync(file);
       } else {
         if (!shareItem.groups) shareItem.groups = [];
         shareItem.groups.push(id);
