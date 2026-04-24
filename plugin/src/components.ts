@@ -445,8 +445,9 @@ export class DownloadModal extends Modal {
         .addText((text) =>
           text
             .setPlaceholder("Share-group-1")
+            .setValue(this.shareId ? this.shareId : "")
             .onChange((value) => {
-              this.group = value;
+              this.shareId = value;
             }),
         );
     } else {
@@ -485,31 +486,31 @@ export class DownloadModal extends Modal {
 
   async startDownload() {
     if (this.mode === "group") {
-      if (!this.group || !this.plugin.activeWriter) {
+      if (!this.shareId || !this.plugin.activeWriter) {
         new Notice("Could not complete action. Check console for details.");
         console.error("[OPV] No group name provided or no active writer.");
         return;
       }
-      this.plugin.activeDownloads.set(this.group, this.pin);
+      this.plugin.activeDownloads.set(this.shareId, this.pin);
       const transportPacket: InnerMessage = {
         type: "group_get",
-        content: this.group,
+        content: this.shareId,
       };
       await joinChannel(
         this.plugin.activeWriter,
-        this.group,
+        this.shareId,
         this.plugin.settings.senderId,
         this.plugin.settings.nickname,
       );
       //TODO: Figure out how to handle collisions with the server (group names)
       await sendSecureMessage(
         this.plugin.activeWriter,
-        this.group,
+        this.shareId,
         this.plugin.settings.senderId,
         transportPacket,
         this.pin,
       );
-      console.debug(`[OPV] Requested group info for group: ${this.group}`);
+      console.debug(`[OPV] Requested group info for group: ${this.shareId}`);
     } else {
       if (!this.shareId) {
         new Notice("Please enter a valid share ID.");
