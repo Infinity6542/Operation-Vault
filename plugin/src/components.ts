@@ -326,7 +326,7 @@ export class ShareModal extends Modal {
         if (values.includes(id)) matches.push(file);
       } else {
         console.debug(
-          `Unhandled type for sync-group frontmatter in ${file.path
+          `[OPV] Unhandled type for sync-group frontmatter in ${file.path
           }: ${typeof groups}`,
         );
       }
@@ -351,6 +351,7 @@ export class ShareModal extends Modal {
         };
         this.plugin.settings.sharedItems.push(shareItem);
         if (this.upload) {
+          console.debug("[OPV] Requesting to upload file.", shareItem);
           await upload(file, this.plugin, shareItem.id, shareItem.key);
         }
         await this.plugin.syncHandler.startSync(file);
@@ -382,6 +383,11 @@ export class ShareModal extends Modal {
         message: `Only synced ${index} out of ${matches.length} files for group ${id}.`,
       };
     }
+    group.id = id;
+    if (!this.plugin.settings.syncGroups.find((g) => g.id === id)) {
+      this.plugin.settings.syncGroups.push(group);
+      await this.plugin.saveSettings();
+    }
     await joinChannel(
       this.plugin.activeWriter,
       id,
@@ -389,11 +395,6 @@ export class ShareModal extends Modal {
       this.plugin.settings.nickname,
     );
     console.debug(`[OPV] Joined channel ${id} after creating group`);
-    group.id = id;
-    if (!this.plugin.settings.syncGroups.find((g) => g.id === id)) {
-      this.plugin.settings.syncGroups.push(group);
-      await this.plugin.saveSettings();
-    }
     return id;
   }
 
