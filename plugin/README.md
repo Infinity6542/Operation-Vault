@@ -37,7 +37,7 @@ Using Operation Vault is easy. Use these steps for sharing and downloading:
 > There may be issues with file contents not syncing upon first transfer. If this happens, simply trigger a sync update manually by editing the file.
 #### Sharing (sync group)
 > [!NOTE]
-> Please let all the files download and settle before accessing any file in an incoming sync group.
+> Please let all the files download and settle before accessing any file in an incoming sync group. If some files don't work, please reload both clients while on that. It may take multiple reloads.
 
 1. Add the property "sync-group" to all the files you want to share. Assign this property a name (e.g. `group-alpha`) for each file.
 2. Click on the same "Share file" button as when sharing a singular file (see above step 2 if you need help).
